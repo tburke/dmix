@@ -52,6 +52,8 @@
 	<string name="repeatDescription">Activer/Désactiver répetition</string>
 	<string name="albumartist">Album Artiste</string>
 	<string name="albumartistDescription">Utiliser le tag Album Artiste dans la vue Artistes</string>
+	<string name="albumTrackSort">Tri d\'album par numéro</string>
+	<string name="albumTrackSortDescription">Trier les albums par numéro de piste</string>
 	<string name="version">Version</string>
 	<string name="songs">Chansons</string>
 	<string name="serverInformation">Information serveur</string>
@@ -83,9 +85,9 @@
 	<string name="deletePlaylist">Supprimer la Playlist</string>
 	<string name="preferredConnection">Connexion preferée</string>
 	<string name="chooseWLAN">Choisissez un réseau wifi</string>
-	<string name="wlanBasedSettings">Connexion par WIFI</string>
+	<string name="wlanBasedSettings">Connexion par Wi-Fi</string>
 	<string name="defaultSettings">Paramètres de connexion par défaut</string>
-	<string name="wlanBasedSettingsDescription">Définir l\'addresse/port du serveur MPD (WIFI)</string>
+	<string name="wlanBasedSettingsDescription">Définir l\'addresse/port du serveur MPD (Wi-Fi)</string>
 	<string name="defaultSettingsDescription">Définir l\'addresse/port et mot de passe du serveur MPD par défaut</string>
 	<string name="stream">Streaming</string>
 	<string name="buffering">Mise en cache …</string>
@@ -155,10 +157,48 @@
 	<string name="defaultLibraryScreen">Onglet bibliothèque par defaut</string>
 	<string name="defaultLibraryScreenDescription">Onglet qui s\'affichera lors de l\'ouverture de la bibliothèque</string>
 	<string name="donate">Faire une donation</string>
+	<string name="stop">Stop</string>
 	
 	<string name="behavior">Comportement du téléphone</string>
 	<string name="pauseOnPhoneStateChange">Mettre la musique en pause</string>
 	<string name="pauseOnPhoneStateChangeDescription">Mettre la lecture en pause lors d\'un appel</string>
 	<string name="playOnPhoneStateChange">Reprendre la lecture</string>
 	<string name="playOnPhoneStateChangeDescription">Reprendre la lecture lorsqu\'un appel se termine</string>
+
+	<string name="libraryTabsSettings">Onglets de la bibliothèque</string>
+	<string name="libraryTabsSettingsDescription">Choisir les onglets visibles et leur ordre</string>
+	<string name="visibleTabs">Onglets visibles</string>
+	<string name="hiddenTabs">Onglets cachés</string>
+	
+	<string name="coverArtTitle">Paramètres des pochettes</string>
+	<string name="coverArtDescription">Changer comment les pochettes sont téléchargées et stockées</string>
+	<string name="enableLocalCoverCache">Mettre en cache les pochettes</string>
+	<string name="enableLocalCoverCacheDescription">Sauvegarde les pochettes téléchargées pour un chargement plus rapide</string>
+	<string name="clearLocalCoverCache">Vider le cache</string>
+	<string name="clearLocalCoverCacheDescription">Libère l\'espace utilisé par le cache de pochettes</string>
+	<string name="clearLocalCoverCachePrompt">Supprimer le cache de pochettes ?</string>
+	
+	<string name="goToAlbum">Aller à l\'album</string>
+    <string name="goToArtist">Aller à l\'artiste</string>
+    <string name="goToFolder">Aller au dossier</string>
+    <string name="goToStream">Aller aux flux</string>
+    
+	<string name="actionSongSelected">1 chanson selectionnée</string>
+    <string name="actionSongsSelected">%s chansons selectionnées</string>
+    <string name="searchQueue">Rechercher dans la file …</string>
+	<string name="enableCoverOnlyOnWifi">Télécharger seulement via Wi-Fi</string>
+	<string name="enableCoverOnlyOnWifiDescription">Ne pas télécharger les pochettes via le réseau mobile. Réduit les frais d\'opérateur</string>
+	<string name="enableExitConfirmation">Demander une confirmation avant de quitter</string>
+    <string name="enableExitConfirmationDescription">Faire effectuer un double appui sur Retour pour quitter</string>
+    <string name="enableLightTheme">Utiliser le thème clair</string>
+    <string name="enableLightNowPlayingTheme">Utiliser le thème clair pour "En Cours"</string>
+    <string name="enableLightNowPlayingThemeDescription">Redémarrer l\'application pour voir les changements</string>
+    <string name="share">Partager</string>
+    <string name="sharePrefix">Now Playing :</string>
+	<string name="enableTabletUI">Utiliser l\'interface pour tablette</string>
+    <string name="enableTabletUIDescription">Redémarrer l\'application pour voir les changements</string>
+    
+	<string name="enableAlbumArtLibrary">Pochettes d\'album dans la biliothèque</string>
+	<string name="enableAlbumArtLibraryDescription">Utiliser des larges pochettes pour la liste d\'albums dans la bibliothèque. Cette fonctionnalité est expérimentale ! Vous serez peut-être victime de lag et/ou plantages. (Nécessite le cache de pochettes)</string>
+	<string name="albumGridWifiUnavailable">Wi-Fi non disponible, aucune pochette ne sera téléchargée</string>
 </resources>

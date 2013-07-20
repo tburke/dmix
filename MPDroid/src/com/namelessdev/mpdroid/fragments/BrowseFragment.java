@@ -3,8 +3,6 @@ package com.namelessdev.mpdroid.fragments;
 import java.util.List;
 
 import org.a0z.mpd.Item;
-import org.a0z.mpd.MPDPlaylist;
-import org.a0z.mpd.MPDStatus;
 import org.a0z.mpd.exception.MPDServerException;
 
 import android.annotation.TargetApi;
@@ -20,18 +18,20 @@ import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.EditText;
 import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.AbsListView;
 import android.widget.TextView;
 
-import com.actionbarsherlock.app.SherlockListFragment;
+import com.actionbarsherlock.app.SherlockFragment;
 import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.adapters.ArrayIndexerAdapter;
 import com.namelessdev.mpdroid.helpers.MPDAsyncHelper.AsyncExecListener;
 
-public abstract class BrowseFragment extends SherlockListFragment implements OnMenuItemClickListener, AsyncExecListener {
+public abstract class BrowseFragment extends SherlockFragment implements OnMenuItemClickListener, AsyncExecListener, OnItemClickListener {
 
 	protected int iJobID = -1;
 
@@ -46,10 +46,12 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 
 	protected List<? extends Item> items = null;
 	
+	protected MPDApplication app = null;
 	protected View loadingView;
 	protected TextView loadingTextView;
 	protected View noResultView;
-	protected ListView list;
+	protected AbsListView list;
+	private boolean firstUpdateDone = false;
 
 	String context;
 	int irAdd, irAdded;
@@ -68,6 +70,7 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 	@Override
 	public void onActivityCreated(Bundle savedInstanceState) {
 		super.onActivityCreated(savedInstanceState);
+		app = (MPDApplication) getActivity().getApplicationContext();
 		try {
 			Activity activity = this.getActivity();
 			ActionBar actionBar = activity.getActionBar();
@@ -84,29 +87,56 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 	@Override
 	public void onStart() {
 		super.onStart();
-		MPDApplication app = (MPDApplication) getActivity().getApplicationContext();
 		app.setActivity(getActivity());
+		if(!firstUpdateDone) {
+			firstUpdateDone = true;
+			UpdateList();
+		}
 	}
 
 	@Override
 	public void onStop() {
 		super.onStop();
-		MPDApplication app = (MPDApplication) getActivity().getApplicationContext();
 		app.unsetActivity(getActivity());
 	}
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.browse, container, false);
-		list = (ListView) view.findViewById(android.R.id.list);
+		list = (ListView) view.findViewById(R.id.list);
+		registerForContextMenu(list);
+		list.setOnItemClickListener(this);
 		loadingView = view.findViewById(R.id.loadingLayout);
 		loadingTextView = (TextView) view.findViewById(R.id.loadingText);
 		noResultView = view.findViewById(R.id.noResultLayout);
-		loadingView.setVisibility(View.VISIBLE);
 		loadingTextView.setText(getLoadingText());
 		return view;
 	}
 	
+	@Override
+	public void onViewCreated(View view, Bundle savedInstanceState) {
+		super.onViewCreated(view, savedInstanceState);
+		if(items != null) {
+			list.setAdapter(getCustomListAdapter());
+		}
+	}
+
+	@Override
+	public void onDestroyView() {
+		// help out the GC; imitated from ListFragment source
+		loadingView = null;
+		loadingTextView = null;
+		noResultView = null;
+		super.onDestroyView();
+	}
+
+	/*
+	 * Override this to display a custom activity title
+	 */
+	public String getTitle() {
+		return "";
+	}
+
 	/*
 	 * Override this to display a custom loading text
 	 */
@@ -119,9 +149,9 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 	}
 
 	public void UpdateList() {
+		list.setAdapter(null);
 		noResultView.setVisibility(View.GONE);
 		loadingView.setVisibility(View.VISIBLE);
-		MPDApplication app = (MPDApplication) getActivity().getApplication();
 
 		// Loading Artists asynchronous...
 		app.oMPDAsyncHelper.addAsyncExecListener(this);
@@ -169,107 +199,79 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 		}
 	}
 
-	protected abstract void Add(Item item);
-	protected abstract void Add(Item item, String playlist);
+	protected abstract void add(Item item, boolean replace, boolean play);
+
+	protected abstract void add(Item item, String playlist);
+
 	@Override
 	public boolean onMenuItemClick(final android.view.MenuItem item) {
 		final AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
-		final MPDApplication app = (MPDApplication) getActivity().getApplication();
 		switch (item.getGroupId()) {
-		case ADDNREPLACEPLAY:
-		case ADDNREPLACE:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						String status = app.oMPDAsyncHelper.oMPD.getStatus().getState();
-						app.oMPDAsyncHelper.oMPD.stop();
-						app.oMPDAsyncHelper.oMPD.getPlaylist().clear();
-
-						Add(items.get((int) info.id));
-						if (status.equals(MPDStatus.MPD_STATE_PLAYING) || item.getItemId() == ADDNREPLACEPLAY) {
-							app.oMPDAsyncHelper.oMPD.play();
+			case ADDNREPLACEPLAY:
+			case ADDNREPLACE:
+			case ADD:
+			case ADDNPLAY:
+				app.oMPDAsyncHelper.execAsync(new Runnable() {
+					@Override
+					public void run() {
+						boolean replace = false;
+						boolean play = false;
+						switch (item.getGroupId()) {
+							case ADDNREPLACEPLAY:
+								replace = true;
+								play = true;
+								break;
+							case ADDNREPLACE:
+								replace = true;
+								break;
+							case ADDNPLAY:
+								play = true;
+								break;
 						}
-					} catch (MPDServerException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+						add(items.get((int) info.id), replace, play);
 					}
-
+				});
+				break;
+			case ADD_TO_PLAYLIST: {
+				final EditText input = new EditText(getActivity());
+				final int id = (int) item.getOrder();
+				if (item.getItemId() == 0) {
+					new AlertDialog.Builder(getActivity())
+							.setTitle(R.string.playlistName)
+							.setMessage(R.string.newPlaylistPrompt)
+							.setView(input)
+							.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+								public void onClick(DialogInterface dialog, int whichButton) {
+									final String name = input.getText().toString().trim();
+									if (null != name && name.length() > 0) {
+										app.oMPDAsyncHelper.execAsync(new Runnable() {
+											@Override
+											public void run() {
+												add(items.get(id), name);
+											}
+										});
+									}
+								}
+							}).setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+								public void onClick(DialogInterface dialog, int whichButton) {
+									// Do nothing.
+								}
+							}).show();
+				} else {
+					add(items.get(id), item.getTitle().toString());
 				}
-			});
-			break;
-		case ADD:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					Add(items.get((int) info.id));
-				}
-			});
-
-			break;
-
-		case ADDNPLAY:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						MPDPlaylist pl = app.oMPDAsyncHelper.oMPD.getPlaylist();
-						int oldsize = pl.size();
-						Add(items.get((int) info.id));
-						try {
-							int id = pl.getByIndex(oldsize).getSongId();
-							app.oMPDAsyncHelper.oMPD.skipToId(id);
-							app.oMPDAsyncHelper.oMPD.play();
-						} catch (NullPointerException e) {
-							// If song adding fails, don't crash !
-						}
-					} catch (MPDServerException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+				break;
+			}
+			default:
+				final String name = item.getTitle().toString();
+				final int id = (int) item.getOrder();
+				app.oMPDAsyncHelper.execAsync(new Runnable() {
+					@Override
+					public void run() {
+						add(items.get(id), name);
 					}
-				}
-			});
-			break;
-		case ADD_TO_PLAYLIST: {
-			final EditText input = new EditText(getActivity());
-			final int id=(int) item.getOrder();
-            if (item.getItemId() == 0) {
-                new AlertDialog.Builder(getActivity())
-                .setTitle(R.string.playlistName)
-                .setMessage(R.string.newPlaylistPrompt)
-                .setView(input)
-                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        final String name = input.getText().toString().trim();
-                        if (null!=name && name.length()>0) {
-                            app.oMPDAsyncHelper.execAsync(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Add(items.get(id), name);
-                                }
-                            });
-                        }
-                    }
-                }).setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        // Do nothing.
-                    }
-                }).show();
-             } else {
-                Add(items.get(id),item.getTitle().toString());
-            }
-			break;
-		}
-		default:
-			final String name=item.getTitle().toString();
-			final int id=(int) item.getOrder();
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					Add(items.get(id), name);
-				}
-			});
-			break;
+				});
+				break;
 		}
 		return false;
 	}
@@ -282,10 +284,15 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 	 * Update the view from the items list if items is set.
 	 */
 	public void updateFromItems() {
+		if (getView() == null) {
+			// The view has been destroyed, bail.
+			return;
+		}
 		if (items != null) {
-			setListAdapter(getCustomListAdapter());
+			list.setAdapter(getCustomListAdapter());
 			try {
-				getListView().setEmptyView(noResultView);
+				if (forceEmptyView() || ((list instanceof ListView) && ((ListView) list).getHeaderViewsCount() == 0))
+					list.setEmptyView(noResultView);
 				loadingView.setVisibility(View.GONE);
 			} catch (Exception e) {}
 		}
@@ -293,6 +300,11 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 
 	protected ListAdapter getCustomListAdapter() {
 		return new ArrayIndexerAdapter(getActivity(), R.layout.simple_list_item_1, items);
+	}
+	
+	//Override if you want setEmptyView to be called on the list even if you have a header
+	protected boolean forceEmptyView() {
+		return false;
 	}
 	
 	@Override
@@ -305,7 +317,7 @@ public abstract class BrowseFragment extends SherlockListFragment implements OnM
 
 	public void scrollToTop() {
 		try {
-			getListView().setSelection(-1);
+			list.setSelection(-1);
 		} catch (Exception e) {
 			// What if the list is empty or some other bug ? I don't want any crashes because of that
 		}

@@ -7,10 +7,12 @@ import org.a0z.mpd.exception.MPDServerException;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
@@ -21,14 +23,16 @@ import android.widget.ArrayAdapter;
 
 import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.app.ActionBar.OnNavigationListener;
-import com.actionbarsherlock.app.SherlockFragmentActivity;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
+import com.namelessdev.mpdroid.MPDroidActivities.MPDroidFragmentActivity;
 import com.namelessdev.mpdroid.fragments.NowPlayingFragment;
 import com.namelessdev.mpdroid.fragments.PlaylistFragment;
+import com.namelessdev.mpdroid.fragments.PlaylistFragmentCompat;
+import com.namelessdev.mpdroid.library.LibraryTabActivity;
 import com.namelessdev.mpdroid.tools.Tools;
 
-public class MainMenuActivity extends SherlockFragmentActivity implements OnNavigationListener {
+public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavigationListener {
 
 	public static final int PLAYLIST = 1;
 
@@ -56,17 +60,21 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
     ViewPager mViewPager;	
     private int backPressExitCount;
     private Handler exitCounterReset;
+	private boolean isDualPaneMode;
 
 	@SuppressLint("NewApi")
 	@TargetApi(11)
 	@Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.main_activity);
+		final MPDApplication app = (MPDApplication) getApplication();
+		setContentView(app.isTabletUiEnabled() ? R.layout.main_activity_tablet : R.layout.main_activity);
         
+		isDualPaneMode = (findViewById(R.id.playlist_fragment) != null);
+
         exitCounterReset = new Handler();
         
-		if (android.os.Build.VERSION.SDK_INT > 9) {
+		if (android.os.Build.VERSION.SDK_INT >= 9) {
 			StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
 			StrictMode.setThreadPolicy(policy);
 		}
@@ -77,11 +85,19 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
 
         // Set up the action bar.
         final ActionBar actionBar = getSupportActionBar();
-		actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
-        actionBar.setDisplayShowTitleEnabled(false);
-        actionBar.setDisplayShowHomeEnabled(true);
+		if (!isDualPaneMode) {
+			actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
+			actionBar.setDisplayShowTitleEnabled(false);
+			actionBar.setDisplayShowHomeEnabled(true);
+		} else {
+			actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_STANDARD);
+			actionBar.setDisplayShowTitleEnabled(true);
+			actionBar.setDisplayShowHomeEnabled(true);
+			setTitle(R.string.nowPlaying);
+		}
         
-        ArrayAdapter<CharSequence> actionBarAdapter = new ArrayAdapter<CharSequence>(this, R.layout.sherlock_spinner_item);
+		ArrayAdapter<CharSequence> actionBarAdapter = new ArrayAdapter<CharSequence>(getSupportActionBar().getThemedContext(),
+				R.layout.sherlock_spinner_item);
         actionBarAdapter.add(getString(R.string.nowPlaying));
         actionBarAdapter.add(getString(R.string.playQueue));
         
@@ -96,7 +112,8 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
         // Set up the ViewPager with the sections adapter.
         mViewPager = (ViewPager) findViewById(R.id.pager);
         mViewPager.setAdapter(mSectionsPagerAdapter);
-		mViewPager.setOverScrollMode(View.OVER_SCROLL_NEVER);
+		if (android.os.Build.VERSION.SDK_INT >= 9)
+			mViewPager.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         // When swiping between different sections, select the corresponding tab.
         // We can also use ActionBar.Tab#select() to do this if we have a reference to the
@@ -124,6 +141,12 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
 		app.unsetActivity(this);
 	}
 
+	@Override
+	protected void onResume() {
+		super.onResume();
+		backPressExitCount = 0;
+	}
+
 	/**
 	 * Called when Back button is pressed, displays message to user indicating the if back button is pressed again the application will exit. We keep a count of how many time back
 	 * button is pressed within 5 seconds. If the count is greater than 1 then call system.exit(0)
@@ -134,7 +157,9 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
 	 */
 	@Override
 	public void onBackPressed() {
-		if (backPressExitCount < 1) {
+		final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
+		final boolean exitConfirmationRequired = settings.getBoolean("enableExitConfirmation", false);
+		if (exitConfirmationRequired && backPressExitCount < 1) {
 			Tools.notifyUser(String.format(getResources().getString(R.string.backpressToQuit)), this);
 			backPressExitCount += 1;
 			exitCounterReset.postDelayed(new Runnable() {
@@ -172,15 +197,23 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
         public Fragment getItem(int i) {
             Fragment fragment = null;
             switch (i) {
-            	case 0: fragment = new NowPlayingFragment(); break;
-            	case 1: fragment = new PlaylistFragment(); break;
+				case 0:
+					fragment = new NowPlayingFragment();
+					break;
+				case 1:
+					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+						fragment = new PlaylistFragment();
+					} else {
+						fragment = new PlaylistFragmentCompat();
+					}
+					break;
             }
             return fragment;
         }
 
         @Override
         public int getCount() {
-            return 2;
+			return isDualPaneMode ? 1 : 2;
         }
 
         @Override
@@ -241,87 +274,129 @@ public class MainMenuActivity extends SherlockFragmentActivity implements OnNavi
 		Intent i = null;
 		final MPDApplication app = (MPDApplication) this.getApplication();
 		final MPD mpd = app.oMPDAsyncHelper.oMPD;
-		
+
 		// Handle item selection
 		switch (item.getItemId()) {
-		case R.id.menu_search:
-			this.onSearchRequested();
-			return true;
-		case R.id.GMM_LibTab:
-			openLibrary();
-			return true;
-		case R.id.GMM_Settings:
-			i = new Intent(this, SettingsActivity.class);
-			startActivityForResult(i, SETTINGS);
-			return true;
-		case R.id.GMM_Outputs:
-			i = new Intent(this, SettingsActivity.class);
-			i.putExtra(SettingsActivity.OPEN_OUTPUT, true);
-			startActivityForResult(i, SETTINGS);
-			return true;
-		case CONNECT:
-			((MPDApplication) this.getApplication()).connect();
-			return true;
-		case R.id.GMM_Stream:
-			if (((MPDApplication) this.getApplication()).getApplicationState().streamingMode) { // yeah, yeah getApplication for that may be ugly but
-																						// ...
-				i = new Intent(this, StreamingService.class);
-				i.setAction("com.namelessdev.mpdroid.DIE");
-				this.startService(i);
-				((MPDApplication) this.getApplication()).getApplicationState().streamingMode = false;
-				// Toast.makeText(this, "MPD Streaming Stopped", Toast.LENGTH_SHORT).show();
-			} else {
-				i = new Intent(this, StreamingService.class);
-				i.setAction("com.namelessdev.mpdroid.START_STREAMING");
-				this.startService(i);
-				((MPDApplication) this.getApplication()).getApplicationState().streamingMode = true;
-				// Toast.makeText(this, "MPD Streaming Started", Toast.LENGTH_SHORT).show();
-			}
-			return true;
-		case R.id.GMM_bonjour:
-			startActivity(new Intent(this, ServerListActivity.class));
-			return true;
-		case R.id.GMM_Consume:
-			try {
-				mpd.setConsume(!mpd.getStatus().isConsume());
-			} catch (MPDServerException e) {
-			}
-			return true;
-		case R.id.GMM_Single:
-			try {
-				mpd.setSingle(!mpd.getStatus().isSingle());
-			} catch (MPDServerException e) {
-			}
-			return true;
-		default:
-			return super.onOptionsItemSelected(item);
+			case R.id.menu_search:
+				this.onSearchRequested();
+				return true;
+			case R.id.GMM_LibTab:
+				openLibrary();
+				return true;
+			case R.id.GMM_Settings:
+				i = new Intent(this, SettingsActivity.class);
+				startActivityForResult(i, SETTINGS);
+				return true;
+			case R.id.GMM_Outputs:
+				i = new Intent(this, SettingsActivity.class);
+				i.putExtra(SettingsActivity.OPEN_OUTPUT, true);
+				startActivityForResult(i, SETTINGS);
+				return true;
+			case CONNECT:
+				((MPDApplication) this.getApplication()).connect();
+				return true;
+			case R.id.GMM_Stream:
+				if (app.getApplicationState().streamingMode) {
+					i = new Intent(this, StreamingService.class);
+					i.setAction("com.namelessdev.mpdroid.DIE");
+					this.startService(i);
+					((MPDApplication) this.getApplication()).getApplicationState().streamingMode = false;
+					// Toast.makeText(this, "MPD Streaming Stopped", Toast.LENGTH_SHORT).show();
+				} else {
+					if (app.oMPDAsyncHelper.oMPD.isConnected()) {
+						i = new Intent(this, StreamingService.class);
+						i.setAction("com.namelessdev.mpdroid.START_STREAMING");
+						this.startService(i);
+						((MPDApplication) this.getApplication()).getApplicationState().streamingMode = true;
+						// Toast.makeText(this, "MPD Streaming Started", Toast.LENGTH_SHORT).show();
+					}
+				}
+				return true;
+			case R.id.GMM_bonjour:
+				startActivity(new Intent(this, ServerListActivity.class));
+				return true;
+			case R.id.GMM_Consume:
+				try {
+					mpd.setConsume(!mpd.getStatus().isConsume());
+				} catch (MPDServerException e) {
+				}
+				return true;
+			case R.id.GMM_Single:
+				try {
+					mpd.setSingle(!mpd.getStatus().isSingle());
+				} catch (MPDServerException e) {
+				}
+				return true;
+			default:
+				return super.onOptionsItemSelected(item);
 		}
 
 	}
 	
-	public boolean onKeyDown(final int keyCode, final KeyEvent event) {
+	@Override
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
 		final MPDApplication app = (MPDApplication) getApplicationContext();
-		switch (keyCode) {
+		switch (event.getKeyCode()) {
+		case KeyEvent.KEYCODE_VOLUME_UP:
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						app.oMPDAsyncHelper.oMPD.next();
+					} catch (MPDServerException e) {
+						e.printStackTrace();
+					}
+				}
+			}).start();
+			return true;
+		case KeyEvent.KEYCODE_VOLUME_DOWN:
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						app.oMPDAsyncHelper.oMPD.previous();
+					} catch (MPDServerException e) {
+						e.printStackTrace();
+					}
+				}
+			}).start();
+			return true;
+		}
+		return super.onKeyLongPress(keyCode, event);
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+			// For onKeyLongPress to work
+			event.startTracking();
+			return true;
+		}
+		return super.onKeyDown(keyCode, event);
+	}
+
+	@Override
+	public boolean onKeyUp(int keyCode, final KeyEvent event) {
+		final MPDApplication app = (MPDApplication) getApplicationContext();
+		switch (event.getKeyCode()) {
 		case KeyEvent.KEYCODE_VOLUME_UP:
 		case KeyEvent.KEYCODE_VOLUME_DOWN:
-			if(!app.getApplicationState().streamingMode) {
+			if (event.isTracking() && !event.isCanceled() && !app.getApplicationState().streamingMode) {
 				new Thread(new Runnable() {
 					@Override
 					public void run() {
 						try {
-							app.oMPDAsyncHelper.oMPD.adjustVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP ? NowPlayingFragment.VOLUME_STEP : -NowPlayingFragment.VOLUME_STEP);
+							app.oMPDAsyncHelper.oMPD.adjustVolume(event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_UP ? NowPlayingFragment.VOLUME_STEP
+									: -NowPlayingFragment.VOLUME_STEP);
 						} catch (MPDServerException e) {
 							e.printStackTrace();
 						}
 					}
 				}).start();
-				return true;
 			}
-			break;
-		default:
-			return super.onKeyDown(keyCode, event);
+			return true;
 		}
-		return super.onKeyDown(keyCode, event);
+		return super.onKeyUp(keyCode, event);
 	}
     
 }

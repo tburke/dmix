@@ -5,23 +5,26 @@ import java.util.List;
 
 import org.a0z.mpd.Directory;
 import org.a0z.mpd.Item;
-import org.a0z.mpd.MPD;
 import org.a0z.mpd.MPDCommand;
 import org.a0z.mpd.Music;
 import org.a0z.mpd.exception.MPDServerException;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.AdapterView;
 
-import com.namelessdev.mpdroid.FSActivity;
-import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.R;
+import com.namelessdev.mpdroid.library.ILibraryFragmentActivity;
 import com.namelessdev.mpdroid.tools.Tools;
 
 public class FSFragment extends BrowseFragment {
+	private static final String EXTRA_DIRECTORY = "directory";
+
 	private Directory currentDirectory = null;
+	private String directory = null;
 
 	public FSFragment() {
 		super(R.string.addDirectory, R.string.addedDirectoryToPlaylist, MPDCommand.MPD_SEARCH_FILENAME);
@@ -30,27 +33,41 @@ public class FSFragment extends BrowseFragment {
 	@Override
 	public void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
+		if (icicle != null)
+			init(icicle.getString(EXTRA_DIRECTORY));
 	}
 
 	@Override
-	public void onActivityCreated(Bundle savedInstanceState) {
-		super.onActivityCreated(savedInstanceState);
-		registerForContextMenu(getListView());
-		UpdateList();
+	public String getTitle() {
+		if(directory == null) {
+			return getString(R.string.files);
+		} else {
+			return directory;
+		}
+	}
+	
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		outState.putString(EXTRA_DIRECTORY, directory);
+		super.onSaveInstanceState(outState);
 	}
 
+	public FSFragment init(String path) {
+		directory = path;
+		return this;
+	}
+	
 	@Override
-	protected void Add(Item item) {
+	protected void add(Item item, boolean replace, boolean play) {
 		try {
-			MPDApplication app = (MPDApplication) getActivity().getApplication();
-			Directory ToAdd = currentDirectory.getDirectory(item.getName());
+			final Directory ToAdd = currentDirectory.getDirectory(item.getName());
 			if (ToAdd != null) {
 				// Valid directory
-				app.oMPDAsyncHelper.oMPD.getPlaylist().add(ToAdd);
+				app.oMPDAsyncHelper.oMPD.add(ToAdd, replace, play);
 				Tools.notifyUser(String.format(getResources().getString(R.string.addedDirectoryToPlaylist), item),
 						FSFragment.this.getActivity());
 			} else {
-				app.oMPDAsyncHelper.oMPD.getPlaylist().add((Music) item);
+				app.oMPDAsyncHelper.oMPD.add((Music) item, replace, play);
 				Tools.notifyUser(getResources().getString(R.string.songAdded, item), FSFragment.this.getActivity());
 			}
 		} catch (MPDServerException e) {
@@ -59,9 +76,8 @@ public class FSFragment extends BrowseFragment {
 	}
 	
 	@Override
-	protected void Add(Item item, String playlist) {
+	protected void add(Item item, String playlist) {
 		try {
-			MPDApplication app = (MPDApplication) getActivity().getApplication();
 			Directory ToAdd = currentDirectory.getDirectory(item.getName());
 			if (ToAdd != null) {
 				// Valid directory
@@ -81,11 +97,8 @@ public class FSFragment extends BrowseFragment {
 	
 	@Override
 	protected void asyncUpdate() {
-		MPDApplication app = (MPDApplication) getActivity().getApplication();
-		if (this.getActivity().getIntent().getStringExtra("directory") != null) {
-			currentDirectory = app.oMPDAsyncHelper.oMPD.getRootDirectory().makeDirectory(
-					(String) this.getActivity().getIntent().getStringExtra("directory"));
-			setActivityTitle((String) getActivity().getIntent().getStringExtra("directory"));
+		if (directory != null) {
+			currentDirectory = app.oMPDAsyncHelper.oMPD.getRootDirectory().makeDirectory(directory);
 		} else {
 			currentDirectory = app.oMPDAsyncHelper.oMPD.getRootDirectory();
 		}
@@ -96,19 +109,18 @@ public class FSFragment extends BrowseFragment {
 			e.printStackTrace();
 		}
 
-        List<Item> dirItems=new ArrayList<Item>();
-        dirItems.addAll(currentDirectory.getDirectories());
-        dirItems.addAll(currentDirectory.getFiles());
-        items=dirItems;
+		List<Item> dirItems=new ArrayList<Item>();
+		dirItems.addAll(currentDirectory.getDirectories());
+		dirItems.addAll(currentDirectory.getFiles());
+		items=dirItems;
 	}
 
 	@Override
-	public void onListItemClick(ListView l, View v, int position, long id) {
+	public void onItemClick(AdapterView l, View v, int position, long id) {
 		// click on a file
 		if (position > currentDirectory.getDirectories().size() - 1 || currentDirectory.getDirectories().size() == 0) {
 
 			final Music music = (Music) currentDirectory.getFiles().toArray()[position - currentDirectory.getDirectories().size()];
-			final MPDApplication app = (MPDApplication) getActivity().getApplication();
 			app.oMPDAsyncHelper.execAsync(new Runnable() {
 				@Override
 				public void run() {
@@ -124,20 +136,16 @@ public class FSFragment extends BrowseFragment {
 				}
 			});
 		} else {
-			// click on a directory
-			// open the same sub activity, it would be better to reuse the
-			// same instance
-
-			Intent intent = new Intent(getActivity(), FSActivity.class);
-			String dir;
-
-			dir = ((Directory) currentDirectory.getDirectories().toArray()[position]).getFullpath();
-			if (dir != null) {
-				intent.putExtra("directory", dir);
-				startActivityForResult(intent, -1);
-			}
+			final String dir = ((Directory) currentDirectory.getDirectories().toArray()[position]).getFullpath();
+			((ILibraryFragmentActivity) getActivity()).pushLibraryFragment(new FSFragment().init(dir), "filesystem");
 		}
 
+	}
+	
+	//Disable the indexer for FSFragment
+	@SuppressWarnings("unchecked")
+	protected ListAdapter getCustomListAdapter() {
+		return new ArrayAdapter<Item>(getActivity(), R.layout.simple_list_item_1, (List<Item>) items);
 	}
 
 }

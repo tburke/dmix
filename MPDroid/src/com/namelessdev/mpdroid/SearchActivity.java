@@ -5,8 +5,6 @@ import java.util.Collections;
 
 import org.a0z.mpd.Album;
 import org.a0z.mpd.Artist;
-import org.a0z.mpd.MPDPlaylist;
-import org.a0z.mpd.MPDStatus;
 import org.a0z.mpd.Music;
 import org.a0z.mpd.exception.MPDServerException;
 
@@ -16,19 +14,22 @@ import android.os.Bundle;
 import android.view.ContextMenu;
 import android.view.MenuItem.OnMenuItemClickListener;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import com.actionbarsherlock.app.SherlockListActivity;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
+import com.namelessdev.mpdroid.MPDroidActivities.MPDroidActivity;
 import com.namelessdev.mpdroid.adapters.SeparatedListAdapter;
 import com.namelessdev.mpdroid.helpers.MPDAsyncHelper.AsyncExecListener;
+import com.namelessdev.mpdroid.library.SimpleLibraryActivity;
 import com.namelessdev.mpdroid.tools.Tools;
 import com.namelessdev.mpdroid.views.SearchResultDataBinder;
 
-public class SearchActivity extends SherlockListActivity implements OnMenuItemClickListener, AsyncExecListener {
+public class SearchActivity extends MPDroidActivity implements OnMenuItemClickListener, AsyncExecListener, OnItemClickListener {
 	public static final int MAIN = 0;
 	public static final int PLAYLIST = 3;
 
@@ -41,6 +42,7 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 	private ArrayList<Object> arrayResults;
 	
 	protected int iJobID = -1;
+	private ListView list = null;
 	protected View loadingView;
 	protected TextView loadingTextView;
 	protected View noResultView;
@@ -61,6 +63,8 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 		app = (MPDApplication) getApplication();
 		
 		setContentView(R.layout.browse);
+		list = (ListView) findViewById(R.id.list);
+		list.setOnItemClickListener(this);
 		loadingView = findViewById(R.id.loadingLayout);
 		loadingTextView = (TextView) findViewById(R.id.loadingText);
 		noResultView = findViewById(R.id.noResultLayout);
@@ -78,7 +82,7 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 
 		setTitle(getTitle() + " : " + searchKeywords);
 
-		registerForContextMenu(getListView());
+		registerForContextMenu(list);
 		updateList();
 		getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}
@@ -143,47 +147,44 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 		}
 	}
 	
-	@Override
-	protected void onListItemClick(ListView l, View v, int position, long id) {
-		Object selectedItem = l.getAdapter().getItem(position);
+	public void onItemClick(AdapterView adapterView, View v, int position, long id) {
+		Object selectedItem = adapterView.getAdapter().getItem(position);
 		if(selectedItem instanceof Music) {
-			add((Music) selectedItem);
+			add((Music) selectedItem, false, false);
 		} else if(selectedItem instanceof Artist) {
-			Intent intent = new Intent(this, AlbumsActivity.class);
+			Intent intent = new Intent(this, SimpleLibraryActivity.class);
 			intent.putExtra("artist", ((Artist) selectedItem));
 			startActivityForResult(intent, -1);
 		} else if(selectedItem instanceof Album) {
-			Intent intent = new Intent(this, SongsActivity.class);
+			Intent intent = new Intent(this, SimpleLibraryActivity.class);
 			intent.putExtra("album", ((Album) selectedItem));
 			startActivityForResult(intent, -1);
 		}
 	}
 
-	protected void add(Object object) {
+	protected void add(Object object, boolean replace, boolean play) {
 		setContextForObject(object);
 		if(object instanceof Music) {
-			add((Music) object);
+			add((Music) object, replace, play);
 		} else if (object instanceof Artist) {
-			add(((Artist) object), null);
+			add(((Artist) object), null, replace, play);
 		} else if (object instanceof Album) {
-			add(null, ((Album) object));
+			add(null, ((Album) object), replace, play);
 		}
 	}
 	
-	protected void add(Artist artist, Album album) {
+	protected void add(Artist artist, Album album, boolean replace, boolean play) {
 		try {
-			MPDApplication app = (MPDApplication) getApplication();
-			ArrayList<Music> songs = new ArrayList<Music>(app.oMPDAsyncHelper.oMPD.getSongs(artist, album));
-			app.oMPDAsyncHelper.oMPD.getPlaylist().addAll(songs);
+			app.oMPDAsyncHelper.oMPD.add(artist, album, replace, play);
 			Tools.notifyUser(String.format(getResources().getString(addedString), null == album ? artist.getName() : (null == artist ? album.getName() : artist.getName() + " - " + album.getName())), this);
 		} catch (MPDServerException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	protected void add(Music music) {
+	protected void add(Music music, boolean replace, boolean play) {
 		try {
-			app.oMPDAsyncHelper.oMPD.getPlaylist().add(music);
+			app.oMPDAsyncHelper.oMPD.add(music, replace, play);
 			Tools.notifyUser(String.format(getResources().getString(R.string.songAdded, music.getTitle()), music.getName()), this);
 		} catch (MPDServerException e) {
 			// TODO Auto-generated catch block
@@ -222,58 +223,26 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 		final AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
 		final MPDApplication app = (MPDApplication) getApplication();
 		final Object selectedItem = arrayResults.get((int) info.id);
-		switch (item.getItemId()) {
-		case ADDNREPLACEPLAY:
-		case ADDNREPLACE:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						String status = app.oMPDAsyncHelper.oMPD.getStatus().getState();
-						app.oMPDAsyncHelper.oMPD.stop();
-						app.oMPDAsyncHelper.oMPD.getPlaylist().clear();
-
-						add(selectedItem);
-						if (status.equals(MPDStatus.MPD_STATE_PLAYING) || item.getItemId() == ADDNREPLACEPLAY) {
-							app.oMPDAsyncHelper.oMPD.play();
-						}
-					} catch (MPDServerException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-
+		app.oMPDAsyncHelper.execAsync(new Runnable() {
+			@Override
+			public void run() {
+				boolean replace = false;
+				boolean play = false;
+				switch (item.getItemId()) {
+					case ADDNREPLACEPLAY:
+						replace = true;
+						play = true;
+						break;
+					case ADDNREPLACE:
+						replace = true;
+						break;
+					case ADDNPLAY:
+						play = true;
+						break;
 				}
-			});
-			break;
-		case ADD:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					add(selectedItem);
-				}
-			});
-
-			break;
-
-		case ADDNPLAY:
-			app.oMPDAsyncHelper.execAsync(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						MPDPlaylist pl = app.oMPDAsyncHelper.oMPD.getPlaylist();
-						int oldsize = pl.size();
-						add(selectedItem);
-						int id = pl.getByIndex(oldsize).getSongId();
-						app.oMPDAsyncHelper.oMPD.skipToId(id);
-						app.oMPDAsyncHelper.oMPD.play();
-					} catch (MPDServerException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				}
-			});
-			break;
-		}
+				add(selectedItem, replace, play);
+			}
+		});
 		return false;
 	}
 	
@@ -342,12 +311,12 @@ public class SearchActivity extends SherlockListActivity implements OnMenuItemCl
 	 */
 	public void updateFromItems() {
 		if (arrayResults != null) {
-			setListAdapter(new SeparatedListAdapter(this,
+			list.setAdapter(new SeparatedListAdapter(this,
 					R.layout.simple_list_item_1,
 					new SearchResultDataBinder(),
 					arrayResults));
 			try {
-				getListView().setEmptyView(noResultView);
+				list.setEmptyView(noResultView);
 				loadingView.setVisibility(View.GONE);
 			} catch (Exception e) {}
 		}

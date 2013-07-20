@@ -2,30 +2,22 @@ package com.namelessdev.mpdroid.fragments;
 
 import org.a0z.mpd.Genre;
 import org.a0z.mpd.Item;
-import org.a0z.mpd.MPD;
 import org.a0z.mpd.MPDCommand;
 import org.a0z.mpd.exception.MPDServerException;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ListView;
+import android.widget.AdapterView;
 
-import com.namelessdev.mpdroid.ArtistsActivity;
-import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.R;
+import com.namelessdev.mpdroid.library.ILibraryFragmentActivity;
 import com.namelessdev.mpdroid.tools.Tools;
 
 public class GenresFragment extends BrowseFragment {
-	private MPDApplication app;
 
 	public GenresFragment() {
 		super(R.string.addGenre, R.string.genreAdded, MPDCommand.MPD_SEARCH_GENRE);
-	}
-
-	@Override
-	public void onCreate(Bundle icicle) {
-		super.onCreate(icicle);
 	}
 
 	@Override
@@ -34,18 +26,13 @@ public class GenresFragment extends BrowseFragment {
 	}
 
 	@Override
-	public void onActivityCreated(Bundle savedInstanceState) {
-		super.onActivityCreated(savedInstanceState);
-		app = (MPDApplication) getActivity().getApplication();
-		registerForContextMenu(getListView());
-		UpdateList();
+	public String getTitle() {
+		return getString(R.string.genres);
 	}
 
 	@Override
-	public void onListItemClick(ListView l, View v, int position, long id) {
-		Intent intent = new Intent(getActivity(), ArtistsActivity.class);
-		intent.putExtra("genre", ((Genre) items.get(position)));
-		startActivityForResult(intent, -1);
+	public void onItemClick(AdapterView adapterView, View v, int position, long id) {
+		((ILibraryFragmentActivity) getActivity()).pushLibraryFragment(new ArtistsFragment().init((Genre) items.get(position)), "artist");
 	}
 
 	@Override
@@ -57,7 +44,7 @@ public class GenresFragment extends BrowseFragment {
 	}
 
 	@Override
-	protected void Add(Item item) {
+	protected void add(Item item, boolean replace, boolean play) {
 		try {
 			app.oMPDAsyncHelper.oMPD.getPlaylist().addAll(app.oMPDAsyncHelper.oMPD.find("genre", item.getName()));
 			Tools.notifyUser(String.format(getResources().getString(irAdded), item), getActivity());
@@ -67,7 +54,7 @@ public class GenresFragment extends BrowseFragment {
 	}
 
 	@Override
-	protected void Add(Item item, String playlist) {
+	protected void add(Item item, String playlist) {
 		try {
 			app.oMPDAsyncHelper.oMPD.addToPlaylist(playlist, app.oMPDAsyncHelper.oMPD.find("genre", item.getName()));
 			Tools.notifyUser(String.format(getResources().getString(irAdded), item), getActivity());

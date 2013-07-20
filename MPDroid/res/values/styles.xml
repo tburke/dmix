@@ -28,6 +28,16 @@
     <style name="AppTheme" parent="Theme.Sherlock">
         <item name="android:seekBarStyle">@style/SeekBar</item>
         <item name="listItemHeight">?android:attr/listPreferredItemHeight</item>
+        <item name="noCoverArtIcon">@drawable/no_cover_art</item>
+        <item name="menuButton">@drawable/spinner_default_holo_dark</item>
+        <item name="listItemHandle">@drawable/ic_mp_move</item>
+        <item name="listItemHorizontalSeparatorColor">@color/list_item_horizontal_separator</item>
+        <item name="nowPlayingPrimaryTextColor">@color/nowplaying_primary_text</item>
+        <item name="repeatDisabled">@drawable/ic_media_repeat</item>
+        <item name="repeatEnabled">@drawable/ic_media_repeat_on</item>
+        <item name="shuffleDisabled">@drawable/ic_media_shuffle</item>
+        <item name="shuffleEnabled">@drawable/ic_media_shuffle_on</item>
+        <item name="volumeIcon">@drawable/ic_action_volume</item>
     </style>
     
     <style name="AppTheme.ActionBar" parent="AppTheme">
@@ -61,6 +71,13 @@
         <item name="android:background">?attr/actionBarItemBackground</item>
         <item name="android:minHeight">@dimen/playerbutton_height</item>
     </style>
+    
+    <style name="PlayerSmallButton" parent="android:Widget.Holo.ImageButton">
+        <item name="android:background">?attr/actionBarItemBackground</item>
+        <item name="android:layout_height">@dimen/playerbutton_small_height</item>
+        <item name="android:layout_width">@dimen/playerbutton_small_width</item>
+    </style>
+    
     <style name="InfoSubText" parent="android:Widget.TextView">
         <item name="android:textAppearance">?android:attr/textAppearanceSmall</item>
         <item name="android:textColor">@color/info_sub_text_color</item>

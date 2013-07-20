@@ -18,6 +18,8 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.AudioManager.OnAudioFocusChangeListener;
 import android.media.MediaMetadataRetriever;
@@ -34,13 +36,17 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
+import com.namelessdev.mpdroid.cover.CachedCover;
+import com.namelessdev.mpdroid.helpers.CoverAsyncHelper;
 import com.namelessdev.mpdroid.helpers.MPDAsyncHelper.ConnectionListener;
+import com.namelessdev.mpdroid.tools.Tools;
 
 /**
  * StreamingService is my code which notifies and streams MPD (theoretically) I hope I'm doing things right. Really. And say farewell to your
@@ -239,6 +245,14 @@ public class StreamingService extends Service implements StatusChangeListener, O
 	}
 	
 	@TargetApi(14)
+	private void setMusicCover(Bitmap cover) {
+		if (Build.VERSION.SDK_INT > 14 && remoteControlClient != null) {
+			((RemoteControlClient) remoteControlClient).editMetadata(false)
+					.putBitmap(RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, cover).apply();
+		}
+	}
+
+	@TargetApi(14)
 	private void setMusicInfo(Music song) {
 		if(Build.VERSION.SDK_INT > 14 && remoteControlClient != null && song != null) {
 			MetadataEditor editor = ((RemoteControlClient) remoteControlClient).editMetadata(true);
@@ -302,6 +316,11 @@ public class StreamingService extends Service implements StatusChangeListener, O
 		if (android.os.Build.VERSION.SDK_INT > 9) {
 			StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
 			StrictMode.setThreadPolicy(policy);
+		}
+
+		if (!((MPDApplication) getApplication()).getApplicationState().streamingMode) {
+			stopSelf();
+			return;
 		}
 
 		isServiceRunning = true;
@@ -428,6 +447,10 @@ public class StreamingService extends Service implements StatusChangeListener, O
 	}
 
 	public void showNotification() {
+		showNotification(false);
+	}
+
+	public void showNotification(boolean streamingStatusChanged) {
 		try {
 			MPDApplication app = (MPDApplication) getApplication();
 			MPDStatus statusMpd = null;
@@ -436,10 +459,11 @@ public class StreamingService extends Service implements StatusChangeListener, O
 			} catch (MPDServerException e) {
 				// Do nothing cause I suck hard at android programming
 			}
-			if (statusMpd != null && !isPaused) {
+			// Don't show the notification if paused, except on Jelly bean where it has buttons
+			if (statusMpd != null && (!isPaused || Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN)) {
 				String state = statusMpd.getState();
 				if (state != null) {
-					if (state == oldStatus)
+					if (state == oldStatus && !streamingStatusChanged)
 						return;
 					oldStatus = state;
 					int songPos = statusMpd.getSongPos();
@@ -453,7 +477,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 						views.setImageViewResource(R.id.icon, R.drawable.stat_notify_musicplayer);
 						Notification status = null;
 						NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this)
-						 .setSmallIcon(R.drawable.icon)
+								.setSmallIcon(Build.VERSION.SDK_INT >= 9 ? R.drawable.icon_bw : R.drawable.icon)
 						 .setOngoing(true)
 						 .setContentTitle(getString(R.string.streamStopped))
 						 .setContentIntent(PendingIntent.getActivity(this, 0,
@@ -462,11 +486,53 @@ public class StreamingService extends Service implements StatusChangeListener, O
 							setMusicState(PLAYSTATE_BUFFERING);
 							notificationBuilder.setContentTitle(getString(R.string.buffering));
 							notificationBuilder.setContentText(actSong.getTitle() + " - " + actSong.getArtist());
+							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+								notificationBuilder.addAction(R.drawable.ic_media_stop, getString(R.string.stop), PendingIntent.getService(
+										this, 41,
+										new Intent(this, StreamingService.class).setAction(CMD_REMOTE).putExtra(CMD_COMMAND, CMD_STOP),
+										PendingIntent.FLAG_CANCEL_CURRENT));
+							}
 						} else {
-							setMusicState(PLAYSTATE_PLAYING);
+							setMusicState(isPaused ? PLAYSTATE_PAUSED : PLAYSTATE_PLAYING);
 							notificationBuilder.setContentTitle(actSong.getTitle());
 							notificationBuilder.setContentText(actSong.getAlbum() + " - " + actSong.getArtist());
+							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+								notificationBuilder.addAction(R.drawable.ic_appwidget_music_prev, "", PendingIntent.getService(this, 11,
+										new Intent(this, StreamingService.class).setAction(CMD_REMOTE).putExtra(CMD_COMMAND, CMD_PREV),
+										PendingIntent.FLAG_CANCEL_CURRENT));
+								notificationBuilder.addAction(isPaused ? R.drawable.ic_appwidget_music_play
+										: R.drawable.ic_appwidget_music_pause, "", PendingIntent.getService(this, 21, new Intent(this,
+										StreamingService.class).setAction(CMD_REMOTE).putExtra(CMD_COMMAND, CMD_PLAYPAUSE),
+										PendingIntent.FLAG_CANCEL_CURRENT));
+								notificationBuilder.addAction(R.drawable.ic_appwidget_music_next, "", PendingIntent.getService(this, 31,
+										new Intent(this, StreamingService.class).setAction(CMD_REMOTE).putExtra(CMD_COMMAND, CMD_NEXT),
+										PendingIntent.FLAG_CANCEL_CURRENT));
+							}
 						}
+
+						// Dont make not compatible devices decode the bitmap for nothing
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+							// Check if we have a sdcard cover cache for this song
+							// Maybe find a more efficient way
+							final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(app);
+							if (settings.getBoolean(CoverAsyncHelper.PREFERENCE_CACHE, true)) {
+								final CachedCover cache = new CachedCover(app);
+								final String[] coverArtPath = cache.getCoverUrl(actSong.getArtist(), actSong.getAlbum(), actSong.getPath(),
+										actSong.getFilename());
+								if (coverArtPath != null && coverArtPath.length > 0 && coverArtPath[0] != null) {
+									notificationBuilder.setLargeIcon(Tools.decodeSampledBitmapFromPath(coverArtPath[0], getResources()
+											.getDimensionPixelSize(android.R.dimen.notification_large_icon_width), getResources()
+											.getDimensionPixelSize(android.R.dimen.notification_large_icon_height), true));
+									setMusicCover(Tools.decodeSampledBitmapFromPath(coverArtPath[0],
+											(int) Tools.convertDpToPixel(200, this), (int) Tools.convertDpToPixel(200, this), false));
+								} else {
+									setMusicCover(null);
+								}
+							} else {
+								setMusicCover(null);
+							}
+						}
+
 						status = notificationBuilder.getNotification();
 
 						startForeground(STREAMINGSERVICE_STATUS, status);
@@ -488,7 +554,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 		if (mediaPlayer != null) { // If that stupid thing crashes
 			mediaPlayer.stop(); // So it stops faster
 		}
-		showNotification();
+		showNotification(true);
 	}
 
 	public void resumeStreaming() {
@@ -497,6 +563,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 			return;
 		
 		needStoppedNotification = false;
+		isPaused = false;
 		buffering = true;
 		// MPDApplication app = (MPDApplication) getApplication();
 		// MPD mpd = app.oMPDAsyncHelper.oMPD;
@@ -515,7 +582,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 			mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 			mediaPlayer.setDataSource(streamSource);
 			mediaPlayer.prepareAsync();
-			showNotification();
+			showNotification(true);
 		} catch (IOException e) {
 			// Error ? Notify the user ! (Another day)
 			buffering = false; // Obviously if it failed we are not buffering.
@@ -638,7 +705,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 	@Override
 	public void connectionFailed(String message) {
 		// TODO Auto-generated method stub
-		Toast.makeText(this, "Connection Failed !", Toast.LENGTH_SHORT).show();
+		// Toast.makeText(this, "Connection Failed !", Toast.LENGTH_SHORT).show();
 	}
 
 	@Override

@@ -9,7 +9,10 @@ import org.a0z.mpd.MPDStatus;
 import org.a0z.mpd.event.StatusChangeListener;
 import org.a0z.mpd.exception.MPDServerException;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.CheckBoxPreference;
@@ -22,6 +25,9 @@ import android.preference.PreferenceScreen;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.text.format.Formatter;
+
+import com.namelessdev.mpdroid.cover.CachedCover;
 
 public class SettingsActivity extends PreferenceActivity implements
 		StatusChangeListener {
@@ -37,6 +43,9 @@ public class SettingsActivity extends PreferenceActivity implements
 	private PreferenceScreen pOutputsScreen;
 	private PreferenceScreen pInformationScreen;
 	private Handler handler;
+
+	private EditTextPreference pCacheUsage1;
+ 	private	EditTextPreference pCacheUsage2;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -66,6 +75,17 @@ public class SettingsActivity extends PreferenceActivity implements
 		 * pConnectionScreen.addPreference(wifiConnection);
 		 */
 
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+			final PreferenceCategory interfaceCategory = (PreferenceCategory) findPreference("category_interface");
+			interfaceCategory.removePreference(findPreference("lightTheme"));
+			interfaceCategory.removePreference(findPreference("lightNowPlayingTheme"));
+		}
+
+		if (!getResources().getBoolean(R.bool.isTablet)) {
+			final PreferenceCategory interfaceCategory = (PreferenceCategory) findPreference("category_interface");
+			interfaceCategory.removePreference(findPreference("tabletUI"));
+		}
+
 		final EditTextPreference pVersion = (EditTextPreference) findPreference("version");
 		final EditTextPreference pArtists = (EditTextPreference) findPreference("artists");
 		final EditTextPreference pAlbums = (EditTextPreference) findPreference("albums");
@@ -82,6 +102,20 @@ public class SettingsActivity extends PreferenceActivity implements
 			mp.setEnabled(false);
 			cf.setEnabled(false);
 		}
+
+		// artwork cache usage
+		long size = new CachedCover(app).getCacheUsage();
+		String usage = Formatter.formatFileSize(app, size);
+		pCacheUsage1 = (EditTextPreference) findPreference("cacheUsage1");
+		pCacheUsage1.setSummary(usage);
+		pCacheUsage2 = (EditTextPreference) findPreference("cacheUsage2");
+		pCacheUsage2.setSummary(usage);
+
+		// album art library listing requires cover art cache
+		CheckBoxPreference lcc = (CheckBoxPreference) findPreference("enableLocalCoverCache");
+		CheckBoxPreference aal = (CheckBoxPreference) findPreference("enableAlbumArtLibrary");
+		aal.setEnabled(lcc.isChecked());
+
 		// Enable/Disable playback resume when call ends only if playback pause
 		// is enabled when call starts
 		CheckBoxPreference cPause = (CheckBoxPreference) findPreference("pauseOnPhoneStateChange");
@@ -155,6 +189,13 @@ public class SettingsActivity extends PreferenceActivity implements
 	}
 
 	@Override
+	protected void onDestroy() {
+		MPDApplication app = (MPDApplication) getApplicationContext();
+		app.oMPDAsyncHelper.removeStatusChangeListener(this);
+		super.onDestroy();
+	}
+
+	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		boolean result = super.onCreateOptionsMenu(menu);
 		if (getPreferenceScreen().getKey().equals("connectionscreen"))
@@ -204,16 +245,27 @@ public class SettingsActivity extends PreferenceActivity implements
 			}
 			return true;
 
-		} else if (preference.getKey().equals("enableLocalCover")
-				|| preference.getKey().equals("enableLastFM")) {
-			if (preference.getKey().equals("enableLocalCover")) {
-				CheckBoxPreference c = (CheckBoxPreference) findPreference("enableLastFM");
-				c.setChecked(false);
-			} else if (preference.getKey().equals("enableLastFM")) {
-				CheckBoxPreference c = (CheckBoxPreference) findPreference("enableLocalCover");
-				c.setChecked(false);
-			}
+		} else if (preference.getKey().equals("clearLocalCoverCache")) {
+			new AlertDialog.Builder(this)
+					.setTitle(R.string.clearLocalCoverCache)
+					.setMessage(R.string.clearLocalCoverCachePrompt)
+					.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							MPDApplication app = (MPDApplication) getApplication();
+							new CachedCover(app).clear();
+							pCacheUsage1.setSummary("0.00B");
+							pCacheUsage2.setSummary("0.00B");
+						}
+					})
+					.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							// do nothing
+						}
+					})
+					.show();
+			return true;
 
+		} else if (preference.getKey().equals("enableLocalCover")) {
 			CheckBoxPreference c = (CheckBoxPreference) findPreference("enableLocalCover");
 			Preference mp = (Preference) findPreference("musicPath");
 			Preference cf = (Preference) findPreference("coverFileName");
@@ -226,6 +278,19 @@ public class SettingsActivity extends PreferenceActivity implements
 				cf.setEnabled(false);
 			}
 			return true;
+
+		} else if (preference.getKey().equals("enableLocalCoverCache")) {
+			// album art library listing requires cover art cache
+			CheckBoxPreference lcc = (CheckBoxPreference) findPreference("enableLocalCoverCache");
+			CheckBoxPreference aal = (CheckBoxPreference) findPreference("enableAlbumArtLibrary");
+			if (lcc.isChecked()) {
+				aal.setEnabled(true);
+			}else{
+				aal.setEnabled(false);
+				aal.setChecked(false);
+			}
+			return true;
+
 		} else if (preference.getKey().equals("pauseOnPhoneStateChange")) {
 			// Enable/Disable playback resume when call ends only if playback
 			// pause is enabled when call starts

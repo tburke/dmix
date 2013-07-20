@@ -119,11 +119,11 @@
 	<string name="edit">Edit</string>
 	<string name="nowPlaying">Now Playing</string>
 	<string name="cancel">Cancel</string>
-	<string name="skipToHere">Skip to Here</string>
-	<string name="playNext">Play Next</string>
-	<string name="moveFirst">Move to First</string>
-	<string name="moveLast">Move to Last</string>
-	<string name="removeFromPlaylist">Remove from Playlist</string>
+	<string name="skipToHere">Skip to here</string>
+	<string name="playNext">Play next</string>
+	<string name="moveFirst">Move to first</string>
+	<string name="moveLast">Move to last</string>
+	<string name="removeFromPlaylist">Remove from playlist</string>
 	<string name="manage">Manage</string>
 	<string name="save">Save</string>
 	<string name="sc_LibTab">L</string>
@@ -144,6 +144,7 @@
 	<string name="musicPathDescription">Path to your music directory on the MPD server ie, files/mp3 (music/ for vortexbox users)</string>
 	<string name="coverFileName">Cover filename</string>
 	<string name="coverFileNameDescription">Standard filename for your album artwork ie, folder.jpg (cover.jpg for vortexbox users)</string>
+	<string name="cacheUsage">Cache usage</string>
 	<string name="whatsNew">What\'s new ?</string>
 	<string name="whatsNewDescription">See changelog (opens external webpage)</string>
 	<string name="deleteServer">Delete this server</string>
@@ -179,6 +180,7 @@
 	<string name="singleMode">Single mode</string>
 	<string name="consumeMode">Consume mode</string>
 	<string name="donate">Donate</string>
+	<string name="stop">Stop</string>
 	
 	<string name="behavior">Phone Behavior</string>
 	<string name="pauseOnPhoneStateChange">Pause playback</string>
@@ -191,5 +193,36 @@
 	<string name="visibleTabs">Visible Tabs</string>
 	<string name="hiddenTabs">Hidden Tabs</string>
 	
-	
+	<string name="coverArtTitle">Cover art settings</string>
+	<string name="coverArtDescription">Change how cover art is downloaded and stored</string>
+	<string name="enableLocalCoverCache">Cache cover art</string>
+	<string name="enableLocalCoverCacheDescription">Saves downloaded cover art on the device for faster retrieval</string>
+	<string name="clearLocalCoverCache">Clear cover art cache</string>
+	<string name="clearLocalCoverCacheDescription">Free the storage space used by the cover art cache</string>
+    <string name="clearLocalCoverCachePrompt">Delete all cached cover art ?</string>
+
+	<string name="enableAlbumArtLibrary">Album cover art listing in library</string>
+	<string name="enableAlbumArtLibraryDescription">Use large cover art tiles for the albums listing in the library. This feature is experimental! You may experience lag and/or crashes. (Requires cache cover art)</string>
+    <string name="albumGridWifiUnavailable">Wi-Fi unavailable, so no new artwork will be retrieved</string>
+    
+    <string name="goToAlbum">Go to album</string>
+    <string name="goToArtist">Go to artist</string>
+    <string name="goToFolder">Go to folder</string>
+    <string name="goToStream">Go to streams</string>
+    
+    <string name="actionSongSelected">1 song selected</string>
+    <string name="actionSongsSelected">%s songs selected</string>
+    <string name="searchQueue">Search play queue …</string>
+    <string name="enableCoverOnlyOnWifi">Download via Wi-Fi only</string>
+    <string name="enableCoverOnlyOnWifiDescription">Do not download cover art over mobile network. Reduces carrier charges</string>
+	<string name="enableExitConfirmation">Ask confirmation before exiting</string>
+    <string name="enableExitConfirmationDescription">Require to double tap Back to exit</string>
+    <string name="enableLightTheme">Use light theme</string>
+    <string name="enableLightNowPlayingTheme">Use light theme for "Now Playing"</string>
+    <string name="enableLightNowPlayingThemeDescription">Restart the application to see the changes</string>
+    <string name="share">Share</string>
+    <string name="sharePrefix">Now Playing :</string>
+    <string name="enableTabletUI">Use tablet UI</string>
+    <string name="enableTabletUIDescription">Restart the application to see the changes</string>
+
 </resources>
