@@ -1,5 +1,7 @@
 package org.a0z.mpd;
 
+import java.util.Locale;
+
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -14,8 +16,7 @@ public class Artist extends Item implements Parcelable {
 
 	public Artist(String name, int albumCount) {
 		this.name=name;
-		//this.isVa=null!=name && name.equals("Various Artists");
-		if (null!=name && name.startsWith("The ")) {
+		if (null != name && name.toLowerCase(Locale.getDefault()).startsWith("the ")) {
 			sort=name.substring(4);
 		} else {
 			sort=null;
@@ -82,8 +83,8 @@ public class Artist extends Item implements Parcelable {
 		dest.writeInt(this.albumCount);
 	}
 
-	public static final Parcelable.Creator CREATOR =
-    	new Parcelable.Creator() {
+	public static final Parcelable.Creator<Artist> CREATOR =
+			new Parcelable.Creator<Artist>() {
             public Artist createFromParcel(Parcel in) {
                 return new Artist(in);
             }

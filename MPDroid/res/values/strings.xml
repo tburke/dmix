@@ -35,7 +35,8 @@
 	<string name="addSong">Add song</string>
 	<string name="removeSong">Remove song</string>
 	<string name="removeSongs">Remove songs</string>
-	<string name="removeCountSongs">Removed %s songs</string>
+    <string name="cropSongs">Crop</string>
+    <string name="removeCountSongs">Removed %s songs</string>
 	<string name="clear">Clear</string>
 	<string name="mainMenu">Main Menu</string>
 	<string name="playlistCleared">Playlist cleared</string>
@@ -114,7 +115,7 @@
 	<string name="search_hint">Search …</string>
 	<string name="libraryTabActivity">Library</string>
 	<string name="warningTitle">Please read</string>
-	<string name="warningText1">Welcome to MPDroid 1.0 !\nThis will only display once.\n\nFirst of all, if you don\'t know what a MPD server is, you should uninstall the application now, it is not made for you.\n\nImportant known bug : Widget sometimes crashes or drains battery.\n\nFor previous users, thanks a lot for your support and contributions. I really hope that you will like the new MPDroid version. Feel free to tell me what you dislike or want back in an email :)\nThe old version is stil available on my github page.</string>
+	<string name="warningText1">Welcome to MPDroid 1.0 !\nThis will only display once.\n\nFirst of all, if you don\'t know what a MPD server is, you should uninstall the application now, it is not made for you.\n\nImportant known bug : Widget sometimes crashes or drains battery.\n\nFor previous users, thanks a lot for your support and contributions.</string>
 	<string name="editPlaylist">Edit</string>
 	<string name="edit">Edit</string>
 	<string name="nowPlaying">Now Playing</string>
@@ -181,8 +182,11 @@
 	<string name="consumeMode">Consume mode</string>
 	<string name="donate">Donate</string>
 	<string name="stop">Stop</string>
-	
-	<string name="behavior">Phone Behavior</string>
+    <string name="enableAlbumYearText">Show album year</string>
+    <string name="enableAudioText">Show audio properties</string>
+
+
+    <string name="behavior">Phone Behavior</string>
 	<string name="pauseOnPhoneStateChange">Pause playback</string>
 	<string name="pauseOnPhoneStateChangeDescription">Pause playback when in a call</string>
 	<string name="playOnPhoneStateChange">Resume playback</string>

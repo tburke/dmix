@@ -7,13 +7,11 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
-import android.os.Bundle;
 import android.view.ContextMenu;
 import android.view.View;
 import android.view.WindowManager.BadTokenException;
 import android.widget.AdapterView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
-import android.widget.ListView;
 
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.library.ILibraryFragmentActivity;
@@ -34,7 +32,7 @@ public class PlaylistsFragment extends BrowseFragment {
 	}
 	
 	@Override
-	public void onItemClick(AdapterView adapterView, View v, int position, long id) {
+	public void onItemClick(AdapterView<?> adapterView, View v, int position, long id) {
 		((ILibraryFragmentActivity) getActivity()).pushLibraryFragment(new StoredPlaylistFragment().init(items.get(position).getName()),
 				"stored_playlist");
 	}
@@ -42,7 +40,7 @@ public class PlaylistsFragment extends BrowseFragment {
 	@Override
 	protected void asyncUpdate() {
 		try {
-			items = app.oMPDAsyncHelper.oMPD.getPlaylists();
+			items = app.oMPDAsyncHelper.oMPD.getPlaylists(true);
 		} catch (MPDServerException e) {
 		}
 	}

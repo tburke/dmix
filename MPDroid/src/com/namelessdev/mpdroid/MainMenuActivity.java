@@ -6,9 +6,10 @@ import org.a0z.mpd.exception.MPDServerException;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.app.ActionBar;
+import android.app.ActionBar.OnNavigationListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.StrictMode;
@@ -18,17 +19,14 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 
-import com.actionbarsherlock.app.ActionBar;
-import com.actionbarsherlock.app.ActionBar.OnNavigationListener;
-import com.actionbarsherlock.view.Menu;
-import com.actionbarsherlock.view.MenuItem;
 import com.namelessdev.mpdroid.MPDroidActivities.MPDroidFragmentActivity;
 import com.namelessdev.mpdroid.fragments.NowPlayingFragment;
 import com.namelessdev.mpdroid.fragments.PlaylistFragment;
-import com.namelessdev.mpdroid.fragments.PlaylistFragmentCompat;
 import com.namelessdev.mpdroid.library.LibraryTabActivity;
 import com.namelessdev.mpdroid.tools.Tools;
 
@@ -61,13 +59,14 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
     private int backPressExitCount;
     private Handler exitCounterReset;
 	private boolean isDualPaneMode;
+	private MPDApplication app;
 
 	@SuppressLint("NewApi")
 	@TargetApi(11)
 	@Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-		final MPDApplication app = (MPDApplication) getApplication();
+		app = (MPDApplication) getApplication();
 		setContentView(app.isTabletUiEnabled() ? R.layout.main_activity_tablet : R.layout.main_activity);
         
 		isDualPaneMode = (findViewById(R.id.playlist_fragment) != null);
@@ -84,7 +83,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
         mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
 
         // Set up the action bar.
-        final ActionBar actionBar = getSupportActionBar();
+		final ActionBar actionBar = getActionBar();
 		if (!isDualPaneMode) {
 			actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
 			actionBar.setDisplayShowTitleEnabled(false);
@@ -96,17 +95,12 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 			setTitle(R.string.nowPlaying);
 		}
         
-		ArrayAdapter<CharSequence> actionBarAdapter = new ArrayAdapter<CharSequence>(getSupportActionBar().getThemedContext(),
-				R.layout.sherlock_spinner_item);
+		ArrayAdapter<CharSequence> actionBarAdapter = new ArrayAdapter<CharSequence>(actionBar.getThemedContext(),
+				android.R.layout.simple_spinner_item);
         actionBarAdapter.add(getString(R.string.nowPlaying));
         actionBarAdapter.add(getString(R.string.playQueue));
         
-        if(Build.VERSION.SDK_INT >= 14) {
-        	//Bug on ICS with sherlock's layout
-        	actionBarAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        } else {
-        	actionBarAdapter.setDropDownViewResource(R.layout.sherlock_spinner_dropdown_item);
-        }
+		actionBarAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         actionBar.setListNavigationCallbacks(actionBarAdapter, this);
 
         // Set up the ViewPager with the sections adapter.
@@ -201,11 +195,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 					fragment = new NowPlayingFragment();
 					break;
 				case 1:
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-						fragment = new PlaylistFragment();
-					} else {
-						fragment = new PlaylistFragmentCompat();
-					}
+					fragment = new PlaylistFragment();
 					break;
             }
             return fragment;
@@ -229,7 +219,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		super.onCreateOptionsMenu(menu);
-		getSupportMenuInflater().inflate(R.menu.mpd_mainmenu, menu);
+		getMenuInflater().inflate(R.menu.mpd_mainmenu, menu);
 		return true;
 	}
 	
@@ -370,14 +360,13 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 		if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
 			// For onKeyLongPress to work
 			event.startTracking();
-			return true;
+			return !app.getApplicationState().streamingMode;
 		}
 		return super.onKeyDown(keyCode, event);
 	}
 
 	@Override
 	public boolean onKeyUp(int keyCode, final KeyEvent event) {
-		final MPDApplication app = (MPDApplication) getApplicationContext();
 		switch (event.getKeyCode()) {
 		case KeyEvent.KEYCODE_VOLUME_UP:
 		case KeyEvent.KEYCODE_VOLUME_DOWN:

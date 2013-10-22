@@ -17,6 +17,7 @@ public class AlbumCoverDownloadListener implements CoverDownloadListener {
 	ImageView coverArt;
 	ProgressBar coverArtProgress;
 	boolean lightTheme;
+	boolean bigCoverNotFound;
 
 	public AlbumCoverDownloadListener(Context context, ImageView coverArt, boolean lightTheme) {
 		this.context = context;
@@ -26,10 +27,12 @@ public class AlbumCoverDownloadListener implements CoverDownloadListener {
 		freeCoverDrawable();
 	}
 
-	public AlbumCoverDownloadListener(Context context, ImageView coverArt, ProgressBar coverArtProgress, boolean lightTheme) {
+	public AlbumCoverDownloadListener(Context context, ImageView coverArt, ProgressBar coverArtProgress, boolean lightTheme,
+			boolean bigCoverNotFound) {
 		this.context = context;
 		this.coverArt = coverArt;
 		this.lightTheme = lightTheme;
+		this.bigCoverNotFound = bigCoverNotFound;
 		this.coverArt.setVisibility(View.VISIBLE);
 		this.coverArtProgress = coverArtProgress;
 		this.coverArtProgress.setIndeterminate(true);
@@ -44,9 +47,8 @@ public class AlbumCoverDownloadListener implements CoverDownloadListener {
 			return;
 		try {
 			if (cover != null) {
-				final Drawable oldDrawable = coverArt.getDrawable();
+				freeCoverDrawable(coverArt.getDrawable());
 				coverArt.setImageDrawable(new CoverBitmapDrawable(context.getResources(), cover));
-				freeCoverDrawable(oldDrawable);
 			} else {
 				// Should not be happening, but happened.
 				onCoverNotFound();
@@ -73,8 +75,15 @@ public class AlbumCoverDownloadListener implements CoverDownloadListener {
 		final Drawable coverDrawable = oldDrawable == null ? coverArt.getDrawable() : oldDrawable;
 		if (coverDrawable == null || !(coverDrawable instanceof CoverBitmapDrawable))
 			return;
-		if (oldDrawable == null)
-			coverArt.setImageResource(lightTheme ? R.drawable.no_cover_art_light : R.drawable.no_cover_art);
+		if (oldDrawable == null) {
+			int noCoverDrawable;
+			if (bigCoverNotFound) {
+				noCoverDrawable = lightTheme ? R.drawable.no_cover_art_light_big : R.drawable.no_cover_art_big;
+			} else {
+				noCoverDrawable = lightTheme ? R.drawable.no_cover_art_light : R.drawable.no_cover_art;
+			}
+			coverArt.setImageResource(noCoverDrawable);
+		}
 
 		coverDrawable.setCallback(null);
 		final Bitmap coverBitmap = ((BitmapDrawable) coverDrawable).getBitmap();

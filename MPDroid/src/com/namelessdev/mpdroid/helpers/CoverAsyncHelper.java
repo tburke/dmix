@@ -1,26 +1,5 @@
 package com.namelessdev.mpdroid.helpers;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import org.a0z.mpd.Album;
-import org.a0z.mpd.Item;
-import org.a0z.mpd.MPD;
-import org.a0z.mpd.Music;
-import org.a0z.mpd.exception.MPDServerException;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -34,13 +13,28 @@ import android.os.Message;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
-
 import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.cover.CachedCover;
 import com.namelessdev.mpdroid.cover.ICoverRetriever;
 import com.namelessdev.mpdroid.cover.LastFMCover;
 import com.namelessdev.mpdroid.cover.LocalCover;
 import com.namelessdev.mpdroid.tools.Tools;
+import org.a0z.mpd.Album;
+import org.a0z.mpd.Item;
+import org.a0z.mpd.MPD;
+import org.a0z.mpd.Music;
+import org.a0z.mpd.exception.MPDServerException;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Download Covers Asynchronous with Messages
@@ -58,6 +52,8 @@ public class CoverAsyncHelper extends Handler {
 	public static final String PREFERENCE_LASTFM = "enableLastFM";
 	public static final String PREFERENCE_LOCALSERVER = "enableLocalCover";
 	public static final String PREFERENCE_ONLY_WIFI = "enableCoverOnlyOnWifi";
+
+	private static final boolean DEBUG = false;
 
 	private MPDApplication app = null;
 	private SharedPreferences settings = null;
@@ -175,6 +171,10 @@ public class CoverAsyncHelper extends Handler {
 		coverDownloadListener.add(listener);
 	}
 
+	public void removeCoverDownloadListener(CoverDownloadListener listener) {
+		coverDownloadListener.remove(listener);
+	}
+
 	public void downloadCover(String artist, String album, String path, String filename) {
 		final CoverInfo info = new CoverInfo();
 		info.sArtist = artist;
@@ -207,7 +207,7 @@ public class CoverAsyncHelper extends Handler {
 			this.info = info;
 		}
 
-		public Bitmap getBitmapForRetriever(ICoverRetriever retriever) {
+		public Bitmap[] getBitmapForRetriever(ICoverRetriever retriever) {
 			String[] urls = null;
 			try {
 				// Get URL to the Cover...
@@ -221,30 +221,31 @@ public class CoverAsyncHelper extends Handler {
 				return null;
 			}
 
-			Bitmap downloadedCover = null;
+			Bitmap[] downloadedCovers = null;
 			for (String url : urls) {
 				if (url == null)
 					continue;
-				Log.i(MPDApplication.TAG, "Downloading cover art at url : " + url);
+				if (DEBUG)
+					Log.i(MPDApplication.TAG, "Downloading cover art at url : " + url);
 				if (retriever.isCoverLocal()) {
 					int maxSize = coverMaxSize;
 					if (cachedCoverMaxSize != MAX_SIZE) {
 						maxSize = cachedCoverMaxSize;
 					}
 					if (maxSize == MAX_SIZE) {
-						downloadedCover = BitmapFactory.decodeFile(url);
+						downloadedCovers = new Bitmap[] { BitmapFactory.decodeFile(url) };
 					} else {
-						downloadedCover = Tools.decodeSampledBitmapFromPath(url, maxSize, maxSize, false);
+						downloadedCovers = new Bitmap[] { Tools.decodeSampledBitmapFromPath(url, maxSize, maxSize, false) };
 					}
 				} else {
-					downloadedCover = download(url);
+					downloadedCovers = download(url);
 				}
 
-				if (downloadedCover != null) {
+				if (downloadedCovers != null) {
 					break;
 				}
 			}
-			return downloadedCover;
+			return downloadedCovers;
 		}
 
 		public boolean fillEmptyArtist() {
@@ -252,7 +253,7 @@ public class CoverAsyncHelper extends Handler {
 				return true;
 			try {
 				// load songs for this album
-				final List<? extends Item> songs = app.oMPDAsyncHelper.oMPD.getSongs(null, new Album(info.sAlbum));
+				final List<? extends Item> songs = app.oMPDAsyncHelper.oMPD.getSongs(null, new Album(info.sAlbum, info.sArtist));
 
 				if (songs.size() > 0) {
 					Music song = (Music) songs.get(0);
@@ -268,36 +269,45 @@ public class CoverAsyncHelper extends Handler {
 		}
 
 		public void run() {
-			Bitmap cover = null;
+			Bitmap[] covers = null;
 			if (fillEmptyArtist()) {
 				for (ICoverRetriever coverRetriever : coverRetrievers) {
-					cover = getBitmapForRetriever(coverRetriever);
-					if (cover != null) {
-						Log.i(MPDApplication.TAG, "Found cover art using retriever : " + coverRetriever.getName());
+					covers = getBitmapForRetriever(coverRetriever);
+					if (covers != null && covers[0] != null) {
+						if (DEBUG)
+							Log.i(MPDApplication.TAG, "Found cover art using retriever : " + coverRetriever.getName());
 						// if cover is not read from cache and saving is enabled
 						if (cacheWritable && !(coverRetriever instanceof CachedCover)) {
 							// Save this cover into cache, if it is enabled.
 							for (ICoverRetriever coverRetriever1 : coverRetrievers) {
 								if (coverRetriever1 instanceof CachedCover) {
-									Log.i(MPDApplication.TAG, "Saving cover art to cache");
-									((CachedCover) coverRetriever1).save(info.sArtist, info.sAlbum, cover);
+									if (DEBUG)
+										Log.i(MPDApplication.TAG, "Saving cover art to cache");
+									// Save the fullsize bitmap
+									((CachedCover) coverRetriever1).save(info.sArtist, info.sAlbum, covers[1]);
+									// Release the cover immediately if not used
+									if (covers[0] != covers[1]) {
+										covers[1].recycle();
+										covers[1] = null;
+									}
 								}
 							}
 						}
-						CoverAsyncHelper.this.obtainMessage(EVENT_COVERDOWNLOADED, cover).sendToTarget();
+						CoverAsyncHelper.this.obtainMessage(EVENT_COVERDOWNLOADED, covers[0]).sendToTarget();
 						break;
 					}
 				}
 			}
 
-			if (cover == null) {
-				Log.i(MPDApplication.TAG, "No cover art found");
+			if (covers == null) {
+				if (DEBUG)
+					Log.i(MPDApplication.TAG, "No cover art found");
 				CoverAsyncHelper.this.obtainMessage(EVENT_COVERNOTFOUND).sendToTarget();
 			}
 		}
 	}
 
-	private Bitmap download(String url) {
+	private Bitmap[] download(String url) {
 		URL myFileUrl = null;
 		HttpURLConnection conn = null;
 		try {
@@ -328,14 +338,26 @@ public class CoverAsyncHelper extends Handler {
 							(double) Math.max(o.outHeight, o.outWidth)) / Math.log(0.5)));
 				}
 
-				o.inSampleSize = scale;
-				o.inJustDecodeBounds = false;
 				is.reset();
-				Bitmap bmp = BitmapFactory.decodeStream(is, null, o);
+				o.inSampleSize = 1;
+				o.inJustDecodeBounds = false;
+				Bitmap fullBmp = BitmapFactory.decodeStream(is, null, o);
+				Bitmap bmp = null;
+				if (scale == 1) {
+					// This can cause some problem (a bitmap being freed will free both references)
+					// But the only use is to save it in the cache so it's okay.
+					bmp = fullBmp;
+				} else {
+					o.inSampleSize = scale;
+					o.inJustDecodeBounds = false;
+					is.reset();
+					bmp = BitmapFactory.decodeStream(is, null, o);
+				}
+
 				is.close();
 				conn.disconnect();
 
-				return bmp;
+				return new Bitmap[] { bmp, fullBmp };
 			} catch (Exception e) {
 				return null;
 			}

@@ -23,10 +23,12 @@ import android.content.DialogInterface.OnClickListener;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.Log;
 import android.util.Xml;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager.BadTokenException;
@@ -34,9 +36,6 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.EditText;
 
-import com.actionbarsherlock.view.Menu;
-import com.actionbarsherlock.view.MenuInflater;
-import com.actionbarsherlock.view.MenuItem;
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.cover.LocalCover;
 import com.namelessdev.mpdroid.tools.StreamFetcher;
@@ -173,7 +172,7 @@ public class StreamsFragment extends BrowseFragment {
 	}
 
 	@Override
-	public void onItemClick(AdapterView adapterView, View v, int position, long id) {
+	public void onItemClick(AdapterView<?> adapterView, View v, int position, long id) {
 	}
 
 	@Override

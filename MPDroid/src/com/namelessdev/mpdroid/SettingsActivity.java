@@ -1,7 +1,6 @@
 package com.namelessdev.mpdroid;
 
 import java.util.Collection;
-import java.util.HashMap;
 
 import org.a0z.mpd.MPD;
 import org.a0z.mpd.MPDOutput;
@@ -12,7 +11,6 @@ import org.a0z.mpd.exception.MPDServerException;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.CheckBoxPreference;
@@ -22,13 +20,15 @@ import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceScreen;
+import android.text.format.Formatter;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.text.format.Formatter;
 
 import com.namelessdev.mpdroid.cover.CachedCover;
 
+@SuppressWarnings("deprecation")
 public class SettingsActivity extends PreferenceActivity implements
 		StatusChangeListener {
 
@@ -37,8 +37,7 @@ public class SettingsActivity extends PreferenceActivity implements
 	public static final String OPEN_OUTPUT = "open_output";
 
 	private OnPreferenceClickListener onPreferenceClickListener;
-	private OnPreferenceClickListener onCheckPreferenceClickListener;
-	private HashMap<Integer, CheckBoxPreference> cbPrefs;
+	private SparseArray<CheckBoxPreference> cbPrefs;
 
 	private PreferenceScreen pOutputsScreen;
 	private PreferenceScreen pInformationScreen;
@@ -56,8 +55,7 @@ public class SettingsActivity extends PreferenceActivity implements
 		// Log.i("MPDroid", "onCreate");
 
 		onPreferenceClickListener = new OutputPreferenceClickListener();
-		onCheckPreferenceClickListener = new CheckPreferenceClickListener();
-		cbPrefs = new HashMap<Integer, CheckBoxPreference>();
+		cbPrefs = new SparseArray<CheckBoxPreference>();
 		pOutputsScreen = (PreferenceScreen) findPreference("outputsScreen");
 		pInformationScreen = (PreferenceScreen) findPreference("informationScreen");
 		PreferenceScreen pUpdate = (PreferenceScreen) findPreference("updateDB");
@@ -74,12 +72,6 @@ public class SettingsActivity extends PreferenceActivity implements
 		 * wifiConnection.setOrder(0);
 		 * pConnectionScreen.addPreference(wifiConnection);
 		 */
-
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-			final PreferenceCategory interfaceCategory = (PreferenceCategory) findPreference("category_interface");
-			interfaceCategory.removePreference(findPreference("lightTheme"));
-			interfaceCategory.removePreference(findPreference("lightNowPlayingTheme"));
-		}
 
 		if (!getResources().getBoolean(R.bool.isTablet)) {
 			final PreferenceCategory interfaceCategory = (PreferenceCategory) findPreference("category_interface");
@@ -135,10 +127,6 @@ public class SettingsActivity extends PreferenceActivity implements
 			@Override
 			public void run() {
 				try {
-					final boolean isRandom = app.oMPDAsyncHelper.oMPD
-							.getStatus().isRandom();
-					final boolean isRepeat = app.oMPDAsyncHelper.oMPD
-							.getStatus().isRepeat();
 					final String version = app.oMPDAsyncHelper.oMPD
 							.getMpdVersion();
 					final String artists = ""

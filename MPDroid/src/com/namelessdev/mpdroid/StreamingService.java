@@ -10,6 +10,7 @@ import org.a0z.mpd.Music;
 import org.a0z.mpd.event.StatusChangeListener;
 import org.a0z.mpd.exception.MPDServerException;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -73,7 +74,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 	public static final String CMD_PREV = "PREV";
 	public static final String CMD_NEXT = "NEXT";
 	public static final String CMD_DIE = "DIE"; // Just in case
-	public static Boolean isServiceRunning = false;
+	public static boolean isServiceRunning = false;
 
 	
     /**
@@ -146,9 +147,9 @@ public class StreamingService extends Service implements StatusChangeListener, O
 	private String streamSource;
 	private Boolean buffering;
 	private String oldStatus;
-	private Boolean isPlaying;
-	private Boolean isPaused; // The distinction needs to be made so the service doesn't start whenever it want
-	private Boolean needStoppedNotification;
+	private boolean isPlaying;
+	private boolean isPaused; // The distinction needs to be made so the service doesn't start whenever it want
+	private boolean needStoppedNotification;
 	private Integer lastStartID;
 	//private Integer mediaPlayerError;
 
@@ -159,6 +160,7 @@ public class StreamingService extends Service implements StatusChangeListener, O
 
 	private static final int IDLE_DELAY = 60000;
 
+	@SuppressLint("HandlerLeak")
 	private Handler delayedStopHandler = new Handler() {
 		@Override
 		public void handleMessage(Message msg) {
@@ -210,6 +212,8 @@ public class StreamingService extends Service implements StatusChangeListener, O
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
 		} catch (InvocationTargetException e) {
+			e.printStackTrace();
+		} catch (NullPointerException e) {
 			e.printStackTrace();
 		}
 	}
@@ -373,14 +377,15 @@ public class StreamingService extends Service implements StatusChangeListener, O
 				.setSmallIcon(R.drawable.icon)
 				.setContentIntent(PendingIntent.getActivity(this, 0,
 						new Intent("com.namelessdev.mpdroid.PLAYBACK_VIEWER").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), 0))
-				.getNotification();
+					.build();
 			((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(STREAMINGSERVICE_STOPPED, status);
 		}
 		isServiceRunning = false;
 		setMusicState(PLAYSTATE_STOPPED);
 		unregisterMediaButtonEvent();
 		unregisterRemoteControlClient();
-		audioManager.abandonAudioFocus(this);
+		if (audioManager != null)
+			audioManager.abandonAudioFocus(this);
 		if (mediaPlayer != null) {
 			mediaPlayer.stop();
 			mediaPlayer.release();
@@ -510,30 +515,27 @@ public class StreamingService extends Service implements StatusChangeListener, O
 							}
 						}
 
-						// Dont make not compatible devices decode the bitmap for nothing
-						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-							// Check if we have a sdcard cover cache for this song
-							// Maybe find a more efficient way
-							final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(app);
-							if (settings.getBoolean(CoverAsyncHelper.PREFERENCE_CACHE, true)) {
-								final CachedCover cache = new CachedCover(app);
-								final String[] coverArtPath = cache.getCoverUrl(actSong.getArtist(), actSong.getAlbum(), actSong.getPath(),
-										actSong.getFilename());
-								if (coverArtPath != null && coverArtPath.length > 0 && coverArtPath[0] != null) {
-									notificationBuilder.setLargeIcon(Tools.decodeSampledBitmapFromPath(coverArtPath[0], getResources()
-											.getDimensionPixelSize(android.R.dimen.notification_large_icon_width), getResources()
-											.getDimensionPixelSize(android.R.dimen.notification_large_icon_height), true));
-									setMusicCover(Tools.decodeSampledBitmapFromPath(coverArtPath[0],
-											(int) Tools.convertDpToPixel(200, this), (int) Tools.convertDpToPixel(200, this), false));
-								} else {
-									setMusicCover(null);
-								}
+						// Check if we have a sdcard cover cache for this song
+						// Maybe find a more efficient way
+						final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(app);
+						if (settings.getBoolean(CoverAsyncHelper.PREFERENCE_CACHE, true)) {
+							final CachedCover cache = new CachedCover(app);
+							final String[] coverArtPath = cache.getCoverUrl(actSong.getArtist(), actSong.getAlbum(), actSong.getPath(),
+									actSong.getFilename());
+							if (coverArtPath != null && coverArtPath.length > 0 && coverArtPath[0] != null) {
+								notificationBuilder.setLargeIcon(Tools.decodeSampledBitmapFromPath(coverArtPath[0], getResources()
+										.getDimensionPixelSize(android.R.dimen.notification_large_icon_width), getResources()
+										.getDimensionPixelSize(android.R.dimen.notification_large_icon_height), true));
+								setMusicCover(Tools.decodeSampledBitmapFromPath(coverArtPath[0],
+										(int) Tools.convertDpToPixel(200, this), (int) Tools.convertDpToPixel(200, this), false));
 							} else {
 								setMusicCover(null);
 							}
+						} else {
+							setMusicCover(null);
 						}
 
-						status = notificationBuilder.getNotification();
+						status = notificationBuilder.build();
 
 						startForeground(STREAMINGSERVICE_STATUS, status);
 					}

@@ -7,30 +7,28 @@ import org.a0z.mpd.MPDCommand;
 import org.a0z.mpd.Music;
 import org.a0z.mpd.exception.MPDServerException;
 
-import android.content.Context;
-import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.PopupMenu;
+import android.widget.PopupMenu.OnMenuItemClickListener;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.actionbarsherlock.internal.widget.IcsListPopupWindow;
 import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.adapters.ArrayIndexerAdapter;
-import com.namelessdev.mpdroid.adapters.PopupMenuAdapter;
-import com.namelessdev.mpdroid.adapters.PopupMenuItem;
 import com.namelessdev.mpdroid.helpers.AlbumCoverDownloadListener;
 import com.namelessdev.mpdroid.helpers.CoverAsyncHelper;
 import com.namelessdev.mpdroid.tools.Tools;
@@ -38,7 +36,6 @@ import com.namelessdev.mpdroid.views.SongDataBinder;
 
 public class SongsFragment extends BrowseFragment {
 
-	private static final int FALLBACK_COVER_SIZE = 80; // In DIP
 	private static final String EXTRA_ARTIST = "artist";
 	private static final String EXTRA_ALBUM = "album";
 
@@ -53,7 +50,7 @@ public class SongsFragment extends BrowseFragment {
 
 	CoverAsyncHelper coverHelper;
 	ImageButton albumMenu;
-	IcsListPopupWindow popupMenu;
+	PopupMenu popupMenu;
 
 	public SongsFragment() {
 		super(R.string.addSong, R.string.songAdded, MPDCommand.MPD_SEARCH_TITLE);
@@ -124,62 +121,68 @@ public class SongsFragment extends BrowseFragment {
 			coverArt = (ImageView) headerView.findViewById(R.id.albumCover);
 			coverArtProgress = (ProgressBar) headerView.findViewById(R.id.albumCoverProgress);
 			albumMenu = (ImageButton) headerView.findViewById(R.id.album_menu);
-
-			final MPDApplication app = (MPDApplication) getActivity().getApplication();
-			coverArtListener = new AlbumCoverDownloadListener(getActivity(), coverArt, coverArtProgress, app.isLightThemeSelected());
-			coverHelper = new CoverAsyncHelper(app, PreferenceManager.getDefaultSharedPreferences(getActivity()));
-			coverHelper.setCoverMaxSizeFromScreen(getActivity());
-			coverHelper.setCachedCoverMaxSize(coverArt.getHeight());
-			coverHelper.addCoverDownloadListener(coverArtListener);
 		}
+
+		final MPDApplication app = (MPDApplication) getActivity().getApplication();
+		coverArtListener = new AlbumCoverDownloadListener(getActivity(), coverArt, coverArtProgress, app.isLightThemeSelected(), false);
+		coverHelper = new CoverAsyncHelper(app, PreferenceManager.getDefaultSharedPreferences(getActivity()));
+		coverHelper.setCoverMaxSizeFromScreen(getActivity());
+		final ViewTreeObserver vto = coverArt.getViewTreeObserver();
+		vto.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+			public boolean onPreDraw() {
+				if (coverHelper != null)
+					coverHelper.setCachedCoverMaxSize(coverArt.getMeasuredHeight());
+				return true;
+			}
+		});
+		coverHelper.addCoverDownloadListener(coverArtListener);
+
 		((TextView) headerView.findViewById(R.id.separator_title)).setText(R.string.songs);
 		((ListView) list).addHeaderView(headerView, null, false);
+
+		popupMenu = new PopupMenu(getActivity(), albumMenu);
+		popupMenu.getMenu().add(Menu.NONE, ADD, Menu.NONE, R.string.addAlbum);
+		popupMenu.getMenu().add(Menu.NONE, ADDNREPLACE, Menu.NONE, R.string.addAndReplace);
+		popupMenu.getMenu().add(Menu.NONE, ADDNREPLACEPLAY, Menu.NONE, R.string.addAndReplacePlay);
+		popupMenu.getMenu().add(Menu.NONE, ADDNPLAY, Menu.NONE, R.string.addAndPlay);
+
+		popupMenu.setOnMenuItemClickListener(new OnMenuItemClickListener() {
+
+			@Override
+			public boolean onMenuItemClick(MenuItem item) {
+				final int itemId = item.getItemId();
+				app.oMPDAsyncHelper.execAsync(new Runnable() {
+					@Override
+					public void run() {
+						boolean replace = false;
+						boolean play = false;
+						switch (itemId) {
+							case ADDNREPLACEPLAY:
+								replace = true;
+								play = true;
+								break;
+							case ADDNREPLACE:
+								replace = true;
+								break;
+							case ADDNPLAY:
+								play = true;
+								break;
+						}
+						try {
+							app.oMPDAsyncHelper.oMPD.add(artist, album, replace, play);
+							Tools.notifyUser(String.format(getResources().getString(R.string.albumAdded), album), getActivity());
+						} catch (MPDServerException e) {
+							e.printStackTrace();
+						}
+					}
+				});
+				return true;
+			}
+		});
 
 		albumMenu.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				popupMenu = new IcsListPopupWindow(getActivity());
-				popupMenu.setAdapter(getPopupMenuAdapter(getActivity()));
-				popupMenu.setModal(true);
-				popupMenu.setOnItemClickListener(new OnItemClickListener() {
-					@Override
-					public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
-						final int action = ((PopupMenuItem) adapterView.getAdapter().getItem(position)).actionId;
-
-						app.oMPDAsyncHelper.execAsync(new Runnable() {
-							@Override
-							public void run() {
-								boolean replace = false;
-								boolean play = false;
-								switch (action) {
-									case ADDNREPLACEPLAY:
-										replace = true;
-										play = true;
-										break;
-									case ADDNREPLACE:
-										replace = true;
-										break;
-									case ADDNPLAY:
-										play = true;
-										break;
-								}
-								try {
-									app.oMPDAsyncHelper.oMPD.add(artist, album, replace, play);
-									Tools.notifyUser(String.format(getResources().getString(R.string.albumAdded), album), getActivity());
-								} catch (MPDServerException e) {
-									e.printStackTrace();
-								}
-							}
-						});
-
-						popupMenu.dismiss();
-					}
-				});
-
-				final DisplayMetrics displaymetrics = new DisplayMetrics();
-				getActivity().getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
-				popupMenu.setContentWidth(displaymetrics.widthPixels / 2);
-				popupMenu.setAnchorView(v);
 				popupMenu.show();
 			}
 		});
@@ -195,7 +198,7 @@ public class SongsFragment extends BrowseFragment {
 	}
 
 	@Override
-	public void onItemClick(final AdapterView adapterView, View v, final int position, long id) {
+	public void onItemClick(final AdapterView<?> adapterView, View v, final int position, long id) {
 		app.oMPDAsyncHelper.execAsync(new Runnable() {
 			@Override
 			public void run() {
@@ -359,20 +362,6 @@ public class SongsFragment extends BrowseFragment {
 	@Override
 	protected boolean forceEmptyView() {
 		return true;
-	}
-
-	/**
-	 * Popup button methods and classes
-	 */
-
-	private PopupMenuAdapter getPopupMenuAdapter(Context context) {
-		final PopupMenuItem items[] = new PopupMenuItem[4];
-		items[0] = new PopupMenuItem(ADD, R.string.addAlbum);
-		items[1] = new PopupMenuItem(ADDNREPLACE, R.string.addAndReplace);
-		items[2] = new PopupMenuItem(ADDNREPLACEPLAY, R.string.addAndReplacePlay);
-		items[3] = new PopupMenuItem(ADDNPLAY, R.string.addAndPlay);
-		return new PopupMenuAdapter(context, Build.VERSION.SDK_INT >= 14 ? android.R.layout.simple_spinner_dropdown_item
-				: R.layout.sherlock_spinner_dropdown_item, items);
 	}
 
 }

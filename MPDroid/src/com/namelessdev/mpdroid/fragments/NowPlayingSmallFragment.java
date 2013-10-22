@@ -12,24 +12,25 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.actionbarsherlock.app.SherlockFragment;
 import com.namelessdev.mpdroid.MPDApplication;
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.cover.CoverBitmapDrawable;
 import com.namelessdev.mpdroid.helpers.AlbumCoverDownloadListener;
 import com.namelessdev.mpdroid.helpers.CoverAsyncHelper;
 
-public class NowPlayingSmallFragment extends SherlockFragment implements StatusChangeListener {
+public class NowPlayingSmallFragment extends Fragment implements StatusChangeListener {
 
 	private MPDApplication app;
 	private CoverAsyncHelper coverHelper;
@@ -45,8 +46,6 @@ public class NowPlayingSmallFragment extends SherlockFragment implements StatusC
 	private ImageButton buttonNext;
 	private String lastArtist = "";
 	private String lastAlbum = "";
-
-	private static final int FALLBACK_COVER_SIZE = 48; // In DIP
 
 	@Override
 	public void onAttach(Activity activity) {
@@ -81,11 +80,18 @@ public class NowPlayingSmallFragment extends SherlockFragment implements StatusC
 
 		coverArt = (ImageView) view.findViewById(R.id.albumCover);
 		coverArtProgress = (ProgressBar) view.findViewById(R.id.albumCoverProgress);
-		coverArtListener = new AlbumCoverDownloadListener(getActivity(), coverArt, coverArtProgress, app.isLightThemeSelected());
+		coverArtListener = new AlbumCoverDownloadListener(getActivity(), coverArt, coverArtProgress, app.isLightThemeSelected(), false);
 
 		coverHelper = new CoverAsyncHelper(app, PreferenceManager.getDefaultSharedPreferences(getActivity()));
 		coverHelper.setCoverMaxSizeFromScreen(getActivity());
-		coverHelper.setCachedCoverMaxSize(coverArt.getHeight());
+		final ViewTreeObserver vto = coverArt.getViewTreeObserver();
+		vto.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+			public boolean onPreDraw() {
+				if (coverHelper != null)
+					coverHelper.setCachedCoverMaxSize(coverArt.getMeasuredHeight());
+				return true;
+			}
+		});
 		coverHelper.addCoverDownloadListener(coverArtListener);
 
 		return view;
@@ -237,9 +243,19 @@ public class NowPlayingSmallFragment extends SherlockFragment implements StatusC
 				if (noSong) {
 					title = getResources().getString(R.string.noSongInfo);
 				} else {
-					artist = actSong.getArtist();
-					title = actSong.getTitle();
-					album = actSong.getAlbum();
+					if (actSong.isStream()) {
+						if (actSong.haveTitle()) {
+							title = actSong.getTitle();
+							artist = actSong.getName();
+						} else {
+							title = actSong.getName();
+							artist = "";
+						}
+					} else {
+						artist = actSong.getArtist();
+						title = actSong.getTitle();
+						album = actSong.getAlbum();	
+					}
 				}
 
 				artist = artist == null ? "" : artist;

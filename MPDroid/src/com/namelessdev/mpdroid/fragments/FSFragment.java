@@ -11,10 +11,9 @@ import org.a0z.mpd.exception.MPDServerException;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListAdapter;
-import android.widget.ListView;
-import android.widget.AdapterView;
 
 import com.namelessdev.mpdroid.R;
 import com.namelessdev.mpdroid.library.ILibraryFragmentActivity;
@@ -116,7 +115,7 @@ public class FSFragment extends BrowseFragment {
 	}
 
 	@Override
-	public void onItemClick(AdapterView l, View v, int position, long id) {
+	public void onItemClick(AdapterView<?> l, View v, int position, long id) {
 		// click on a file
 		if (position > currentDirectory.getDirectories().size() - 1 || currentDirectory.getDirectories().size() == 0) {
 
